@@ -10,12 +10,6 @@ class Vertex{
   } 
 }
 
-class Edge{
-  var weight : int ;
-  var sourcev : int;
-  var destv : int ;
-}
-
 class Graph{
 
   var size: int;
@@ -72,9 +66,9 @@ class Graph{
 
 class MinQueue{
 
-    var Repre : set<Vertex> //representing the queue of vertices using integers
+    var Repre : set<Vertex>     //representing the queue of vertices using integers
 
-	method Init()  // Initialise queue to have the empty set
+	method Init()               // Initialise queue to have the empty set
 	modifies this;              //since we always know the queue is never going to be greater capacity than size of graph
 	{    
 	 Repre := {};
@@ -115,33 +109,32 @@ class MinQueue{
 	 requires G.verticesValid() && G.hasVertex(s)
 	 modifies G, G.vertices
 	 modifies set m | 0 <= m < G.vertices.Length  :: G.vertices[m]
+	 ensures G.isValid() && G.verticesValid() && G.hasVertex(s)
+	 ensures G.vertices != null 
+	 ensures G.vertices[s].wfs == 0 //&& G.vertices[s].wfs == 900000
    {
      assert G.vertices != null;
-     var x := G.vertices.Length -1 ;
-     //assert G.vertices != null;
-	 //assert G.hasVertex(s);
+     var x := 0 ;
 	 while x < G.vertices.Length
+	 modifies set m | 0 <= m < G.vertices.Length :: G.vertices[m]
 	 invariant G.isValid()
 	 invariant G.verticesValid()
 	 invariant G.hasVertex(s)
+	 invariant s < G.vertices.Length
 	 {
 	 G.vertices[x].wfs := 900000;
 	 G.vertices[x].pred := 900000;
      x := x + 1 ;
 	 }
-	 //assert G.hasVertex(s);
+	 //assert G.vertices[s].pred == 900000;
 	 G.vertices[s].wfs := 0;
    }
 
-  /* method relax(G: Graph, u: int, v: int, w: int)
-    requires G != null && G.isValid() && G.hasVertex(u) && G.hasVertex(v)
-	modifies G.edgeweights
-	//reads G.edgeweights
-   {
-	 var x := 0;
-	 while x < G.size{
-	 if G.vertices[v].wfs > G.vertices[u].wfs + G.edgeweights[u][v]
-	 {}
-	 }
-   }*/
+   method relax(G: Graph, u: int, v: int, w: int)
+	reads G, G.edgeweights
+	reads set m |  0 <= m < G.edgeweights.Length :: G.edgeweights[m]
+	requires G != null && G.isValid() && G.hasVertex(u) && G.hasVertex(v) && G.edges()
+	modifies G, G.edgeweights
+	modifies set m |  0 <= m < G.edgeweights.Length :: G.edgeweights[m]
+   {}
    } 
