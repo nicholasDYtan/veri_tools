@@ -1,7 +1,9 @@
+module DijkstraI{
+
 class Vertex{
   var wfs : int ;         //Vertex contains current length from source as int, does not matter what the type of vertex is
-  var pred: int ;        //Vertex Predecessor, "pi" as described in CLRS implementation
-
+  var pred: int ;         //Vertex Predecessor, "pi" as described in CLRS implementation
+  
   constructor Init()
   modifies this
   {
@@ -24,11 +26,29 @@ class Graph{
     0 <= v < size && 0 <= v < vertices.Length
   }
 
+  method getVertNo(v: Vertex) returns (i: int)
+  requires this.isValid() && this.verticesValid() 
+  requires v != null
+  {
+    i := vertices.Length;
+	var m := 0;
+	while (m < vertices.Length)
+	invariant   i <= vertices.Length 
+	invariant isValid() 
+	invariant verticesValid()
+	{
+	  if((v.wfs == vertices[m].wfs) && (v.pred == vertices[m].pred)) {i:= m;}
+	  m := m + 1;
+	}
+  }
+
   predicate isValid()
   reads this, this.edgeweights, this.vertices
   {
-   (this.edgeweights != null && 
-   this.vertices != null) &&
+   (
+   this.size >= 2 &&
+   this.edgeweights != null && 
+   this.vertices != null) &&        // line that specifies that object is non-null
    this.edgeweights.Length == size &&
    this.vertices.Length == size  &&
    forall n :: 0 <= n < this.vertices.Length ==> this.vertices[n] != null &&
@@ -49,7 +69,9 @@ class Graph{
 
   predicate verticesValid()
   reads this, this.edgeweights, this.vertices
-  requires this.isValid()
+  requires this.isValid()                
+  /*this case in particular is interesting because an update just rolled out that eliminates the need 
+  to specify that the object in non-null, among other things. On the rise4fun website the earlier error now passes!*/
   reads set n | 0 <= n < vertices.Length :: vertices[n]
   {
   vertices != null &&
@@ -59,7 +81,6 @@ class Graph{
 }
 
 
-	
 
 class MinQueue{
 
@@ -73,45 +94,67 @@ class MinQueue{
 
 	method addV(vertex : Vertex)  //add an integer representing a vertex to the queue
 	modifies this;
+	requires vertex != null
+	ensures |Repre| == old(|Repre|) +1
 	{
 	  Repre := Repre + {vertex};
 	}
 
 	method getSize() returns (size:int)
 	{
-	size := |Repre|;
-	return size;
+		size := |Repre|;
+		return size;
 	}
 
-	predicate isEmpty()
+	predicate method isEmpty()
 	reads this, this.Repre
 	{
 	Repre == {}
 	}
 
-	method removeMin() returns (v: Vertex) // remove the smallest integer from the queue and return it
-	modifies this;                              // since we represent each vertex in the Graph object as its entry in "vertices"
-	requires Repre != {};                       // we need only know which entry has the minimum wfs in the queue
+    predicate method isNotNull(R : set<Vertex>)
+	reads this, this.Repre
+	reads set m | m in Repre 
 	{
-	  var c:= 900000;                       // treat 900000 as infinity
-	  var d := 900000;
-	  var m := new Vertex.Init();
-	  v := new Vertex.Init();
-	  var Repres : set<Vertex> := Repre;   //Repres is a copy of the real queue
+	forall e | e in R :: e != null 
+    }
 
-	  while m in Repres                 //for every integer in Repres( a copy of Repre ), find the minimum 
-	  decreases |Repres| 
-	  {
-	    if m.wfs <=c { c := m.wfs; d:=m.pred;}
-		Repres := Repres - {m};
-	  }
-	  v.wfs := c;  v.pred := d;   // set the return value to the minimum vertex and remove the found integer from Repre, the real queue
+	predicate isBelowLimit(R: set<Vertex>)
+	requires !this.isEmpty() && this.isNotNull(R)
+	reads this, this.Repre
+	reads set d | d in R
+	{
+	forall m | m in R :: m.wfs < 900000
+	}
+
+
+	method removeMin() returns (v: Vertex)      // remove the smallest integer from the queue and return it
+	modifies this;                              // since we represent each vertex in the Graph object as its entry in "vertices"
+	requires Repre != {} && |Repre| >= 1       // we need only know which entry has the minimum wfs in the queue
+	requires isNotNull(Repre) && isBelowLimit(Repre)
+	ensures  |Repre| == old(|Repre|) - 1                    
+	{
+	  var l :| l in Repre;
+      v := l;
+	  var Repres : set<Vertex> := Repre;       //Repres is a copy of the real queue
+
+	  while (Repres != {})                     //for every vertex in Repres( a copy of Repre ), find the minimum wfs vertex
+		decreases |Repres|
+		invariant v != null
+		invariant isNotNull(Repres)
+		invariant isBelowLimit(Repres)
+		{
+			var m :| m in Repres;
+			if (m.wfs < v.wfs) { v := m; }
+			Repres := Repres - {m};
+		}	
+	  assert v in Repre;
 	  Repre := Repre - {v};
 	  return v;
 	}
    }
 
-   class Dijkstra{
+class Dijkstra{
 
    method InitializeSS(G : Graph, s: int)
      requires G != null && G.isValid() 
@@ -123,6 +166,7 @@ class MinQueue{
 	 ensures G.vertices[s].wfs == 0 && G.vertices[s].pred == 900000
    {
      var x := 0 ;
+
 	 while x < G.vertices.Length
 	 modifies set m | 0 <= m < G.vertices.Length :: G.vertices[m]
 	 invariant G.isValid()
@@ -130,19 +174,22 @@ class MinQueue{
 	 invariant G.hasVertex(s)
 	 invariant s < G.vertices.Length
 	 {
-	 G.vertices[x].wfs := 900000;
-	 G.vertices[x].pred := 900000;
-     x := x + 1 ;
+	  G.vertices[x].wfs := 900000;
+	  G.vertices[x].pred := 900000;
+      x := x + 1 ;
 	 }
 	 G.vertices[s].wfs := 0;
 	 G.vertices[s].pred := 900000;
    }
 
   method relax(G: Graph, u: int, v: int)
-	requires G != null && G.isValid() && G.hasVertex(u) && G.hasVertex(v) && G.edges()
+	requires G != null && G.isValid() && G.hasVertex(u) && G.hasVertex(v) && G.edges() 
+	requires G.verticesValid()
 	modifies G, G.edgeweights
 	//modifies set m |  0 <= m < G.edgeweights.Length :: G.edgeweights[m]
 	modifies set n | 0 <= n < G.vertices.Length :: G.vertices[n]
+	ensures G.isValid() && G.hasVertex(u) && G.hasVertex(v) && G.verticesValid()
+	ensures old(G.vertices[v].wfs) >= G.vertices[v].wfs
    {
    if (G.vertices[v].wfs > G.vertices[u].wfs + G.edgeweights[u][v])
 	{
@@ -169,21 +216,38 @@ class MinQueue{
    while i < G.vertices.Length
 	invariant G.isValid()
 	invariant G.hasVertex(source) && G.verticesValid()
+	invariant forall i :: 0 <= i < G.vertices.Length ==> G.vertices[i] != null
+	invariant G.vertices.Length >= 1
 	{
 		Q.addV(G.vertices[i]);
 		i := i + 1;
 	}
 
+	var f := Q.getSize();
+	assert f >= 1;
+
+	 
    while !Q.isEmpty()
+    decreases |Q.Repre|
 	invariant G.isValid()
 	invariant G.hasVertex(source) && G.verticesValid()
-	modifies  G, G.vertices, G.edgeweights
-	modifies Q
-	modifies set m | 0 <= m < G.vertices.Length :: G.vertices[m]
+	modifies  G.edgeweights
+	modifies  Q
 	{
 		u:= Q.removeMin();
+		finishedVertices := finishedVertices + {u};
+		var tempn := G.getVertNo(u);
+		var m := 0;
+		while (m < G.edgeweights.Length) 
+		invariant G.isValid()
+		invariant G.hasVertex(tempn) && G.verticesValid()
+		{
+		  if (0 < G.edgeweights[tempn][m] < 900000) { relax(G, tempn, m); }
+		  m := m + 1;
+		}
 	}
 
    }
    }
-    
+   
+}
