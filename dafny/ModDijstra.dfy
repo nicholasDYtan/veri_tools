@@ -26,41 +26,30 @@ class Graph{
   predicate isValid()
   reads this, this.edges, this.vertices
   {
-  d != null && |vertices| > 0 && |edges| > 0 &&
-  d.Length == |vertices| &&
-  forall m | m in vertices :: (m != null && 0 <= m.id < d.Length ) &&
-  forall m , n | m in vertices && n in vertices && m != n :: (m != null && n != null && m.id != n.id) &&
-  forall e | e in edges :: e != null && 
-  forall e | e in edges :: 0 <= e.source  < d.Length &&
-  forall e | e in edges :: 0 <= e.dest  < d.Length &&
-  forall e | e in edges :: e.source != e.dest &&
-  forall e | e in edges :: !exists d | d in edges :: d != e &&  d.source == e.source && d.dest == e.dest
+  (d != null && |vertices| > 0 && |edges| > 0) &&
+  (d.Length == |vertices|) &&
+  (forall m | m in vertices :: (m != null && 0 <= m.id < d.Length )) &&
+  (forall m , n | m in vertices && n in vertices && m != n :: (m != null && n != null && m.id != n.id)) &&
+  (forall e | e in edges :: e != null) && 
+  (forall e | e in edges :: 0 <= e.source  < d.Length) &&
+  (forall e | e in edges :: 0 <= e.dest  < d.Length) &&
+  (forall e | e in edges :: e.source != e.dest) &&
+  (forall e | e in edges :: !exists d | d in edges :: d != e &&  d.source == e.source && d.dest == e.dest)
   }
 
   predicate method hasVertex(v: Vertex)
   requires isValid()
   reads this, this.vertices, this.edges
   {
-  vertices * {v} == {v}
+  v in vertices
   }
 
   method getVertexwfs(v: Vertex) returns (i: int)
   requires isValid() && hasVertex(v) && v != null
   requires hasVertex(v)  && v in vertices
-  requires 0 <= v.id < d.Length
-  //ensures  exists s :: 0 <= s < d.Length && d[s] == i 
+  ensures d[v.id] == i
   {
-   var x: int := 0;
-	while (x < d.Length)
-	 invariant  hasVertex(v) && isValid() 
-	 invariant  0 <= x <= d.Length
-	 invariant  v in vertices && 0 <= v.id < d.Length
-		{
-			if(v.id == x){ i := d[x]; }
-			x := x + 1 ;
-		}
-   
-   //return i;
+   i := d[v.id];
   }
 
   predicate method hasEdge(u: int, v: int)
@@ -82,12 +71,14 @@ class Graph{
 method removeMin(G: Graph, Q: set<Vertex>) returns (min: Vertex)
 requires G != null && G.isValid() && |Q| > 0 
 requires forall k :: k in Q ==> k in G.vertices
-ensures min in G.vertices 
-//ensures forall k :: k in Q ==> min.wfs <= k.wfs
+ensures min in G.vertices && min in Q
+ensures min != null
+ensures forall k :: k in Q ==> G.d[min.id] <= G.d[k.id]
 {
   var v : Vertex :| v in Q;
   var lowestDistance : int := G.getVertexwfs(v);
   var c := Q;
+
   while( c != {} )
   decreases c
   invariant G != null && G.isValid() && |Q| > 0
@@ -96,7 +87,7 @@ ensures min in G.vertices
   {
    var g : Vertex :| g in c;
    var gwfs := G.getVertexwfs(g);
-   if(gwfs < lowestDistance){ v := g; lowestDistance := gwfs;}
+   if(gwfs <= lowestDistance){ v := g; lowestDistance := gwfs;}
    c := c - {g};
    assert v in G.vertices;
   }
@@ -107,9 +98,9 @@ class Dijkstra
 {
 	method initialisesp(G: Graph, s: Vertex)
 	requires G != null && G.isValid() && G.hasVertex(s)
-	modifies G, G.vertices , G.d
+	modifies G.d
 	ensures G!= null && G.isValid() && G.hasVertex(s)
-	//ensures forall m :: 0 <= m < G.d.Length && m != s.id ==> G.d[m] == -1
+	ensures forall m :: 0 <= m < G.d.Length && m != s.id ==> G.d[m] != 0
 	ensures G.d[s.id] == 0
 	{
 	 var x: int := 0;
@@ -142,27 +133,33 @@ class Dijkstra
 	method sssp(G: Graph, s: Vertex) returns (d : array<int>)
 	requires G != null && G.isValid() && G.hasVertex(s)
 	requires forall e | e in G.edges :: e != null
+	requires G.isValid() ==> forall e | e in G.edges :: e!=null
 	modifies G, G.vertices, G.d
 	{
 	initialisesp(G, s);
 	var settled : set<Vertex> := {};
 	var unsettled : set<Vertex> := G.vertices;
 
-	while unsettled != {} 
+	while (unsettled != {}) 
 	invariant G!=null && G.isValid() && G.hasVertex(s)
 	invariant forall e | e in G.edges :: e != null
-	modifies G, G.d
+	invariant forall v | v in unsettled :: v in G.vertices
+	decreases unsettled
+	modifies  G.vertices, G.d
 	{
 	   var u : Vertex := removeMin(G, unsettled);
+	   assert u != null;
+	   assert u in unsettled;
 	   unsettled := unsettled - {u};
-	   var e := set v : Edge | v in G.edges && v.source == u.id;
+	   var e := set v : Edge | v in G.edges && v.source == u.id && 0 <= v.dest < G.d.Length ;
 	   settled := settled + {u};
 	   
 		while( e != {} )
 		invariant G!=null && G.isValid() && G.hasVertex(s)
+		invariant G.isValid() ==> forall e | e in G.edges :: e != null
 		invariant forall a | a in e :: a in G.edges && a != null
 		invariant G.isValid() ==> forall b | b in e :: b.source < G.d.Length
-		//invariant G.isValid() ==> forall c | c in e :: c.dest < G.d.Length
+		invariant G.isValid() ==> forall c | c in e :: c.dest < G.d.Length
 		modifies  G.d
 		decreases e
 		{
@@ -171,11 +168,7 @@ class Dijkstra
 		  e := e - {l};
 		}
 	}
-
 	return G.d;
 	}
 }
-
-    
-
 }
