@@ -76,31 +76,35 @@ ensures min != null
 ensures forall k :: k in Q ==> G.d[min.id] <= G.d[k.id]
 {
   var v : Vertex :| v in Q;
-  var lowestDistance : int := G.getVertexwfs(v);
+  var lowestDistance : int := G.d[v.id];
   var c := Q;
 
   while( c != {} )
   decreases c
-  invariant G != null && G.isValid() && |Q| > 0
   invariant v in Q
+  invariant G != null && G.isValid() && |Q| > 0
   invariant forall l :: l in c ==> l in Q
+  invariant lowestDistance == G.d[v.id]
+  invariant forall k :: k in Q && k !in c ==> lowestDistance <= G.d[k.id]
   {
    var g : Vertex :| g in c;
-   var gwfs := G.getVertexwfs(g);
+   var gwfs := G.d[g.id];
    if(gwfs <= lowestDistance){ v := g; lowestDistance := gwfs;}
    c := c - {g};
    assert v in G.vertices;
   }
   min := v;
+  return min;
 }
 
 class Dijkstra
 {
 	method initialisesp(G: Graph, s: Vertex)
 	requires G != null && G.isValid() && G.hasVertex(s)
+	requires G.isValid() ==> G.d.Length > 0
 	modifies G.d
 	ensures G!= null && G.isValid() && G.hasVertex(s)
-	ensures forall m :: 0 <= m < G.d.Length && m != s.id ==> G.d[m] != 0
+	ensures forall m :: 0 <= m < G.d.Length && m != s.id ==> G.d[m] == -1
 	ensures G.d[s.id] == 0
 	{
 	 var x: int := 0;
@@ -109,12 +113,15 @@ class Dijkstra
 
 	 while x < G.d.Length
 	 invariant G != null && G.isValid() && G.hasVertex(s)
+	 invariant G.d.Length > 0 ==> G.d != null
 	 invariant 0 <= x <= G.d.Length 
+	 invariant forall j :: 0 <= j < x ==> G.d[j] == -1;
 	 modifies G.d
 	 {
 	  G.d[x] := -1;
 	  x := x + 1 ;
 	 }
+	 assert G.d[0] == -1;
 	 G.d[s.id] := 0;	
 	}
 
@@ -134,7 +141,11 @@ class Dijkstra
 	requires G != null && G.isValid() && G.hasVertex(s)
 	requires forall e | e in G.edges :: e != null
 	requires G.isValid() ==> forall e | e in G.edges :: e!=null
+	requires G.isValid() ==> G.vertices != {}
 	modifies G, G.vertices, G.d
+	ensures G != null && G.isValid() && G.hasVertex(s)
+	ensures G.d.Length != 0 ==> d != null
+	ensures d.Length == G.d.Length 
 	{
 	initialisesp(G, s);
 	var settled : set<Vertex> := {};
@@ -144,6 +155,7 @@ class Dijkstra
 	invariant G!=null && G.isValid() && G.hasVertex(s)
 	invariant forall e | e in G.edges :: e != null
 	invariant forall v | v in unsettled :: v in G.vertices
+	invariant G.d != null
 	decreases unsettled
 	modifies  G.vertices, G.d
 	{
@@ -168,6 +180,9 @@ class Dijkstra
 		  e := e - {l};
 		}
 	}
+	d := G.d;
+	assert G.d != null;
+	assert d != null;
 	return G.d;
 	}
 }
