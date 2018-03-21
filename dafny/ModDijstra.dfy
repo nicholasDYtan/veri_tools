@@ -200,11 +200,7 @@ class Dijkstra
 		invariant forall a | a in e :: a in G.edges && a != null
 		invariant forall b | b in e :: 0 <= b.source < G.d.Length
 		invariant forall c | c in e :: 0 <= c.dest < G.d.Length
-<<<<<<< HEAD
 		//invariant forall l :: l in e ==> l.weight >= 0 && l in G.edges && G.hasEdge(l.source, l.dest)
-=======
-		invariant forall l :: l in e ==> l.weight > 0 && l in G.edges
->>>>>>> origin/master
 		modifies  G.d
 		decreases e
 		{
