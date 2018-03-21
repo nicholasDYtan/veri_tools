@@ -32,7 +32,7 @@ class Graph{
   (forall m | m in vertices :: (m != null && 0 <= m.id < d.Length )) &&
   (forall m , n | m in vertices && n in vertices && m != n :: (m != null && n != null && m.id != n.id)) &&
   (forall e | e in edges :: e != null) &&
-  (forall e | e in edges :: e.weight > 0) &&
+  (forall e | e in edges :: e.weight >= 0) &&
   (forall e | e in edges :: 0 <= e.source  < d.Length) &&
   (forall e | e in edges :: 0 <= e.dest  < d.Length) &&
   (forall e | e in edges :: e.source != e.dest) &&
@@ -60,7 +60,7 @@ class Graph{
   reads this, this.edges, this.vertices
   requires isValid()
   {
-  exists m | m in edges :: m != null && m.source == u && m.dest == v && m.weight > 0
+  exists m | m in edges :: m != null && m.source == u && m.dest == v && m.weight >= 0
   }
 
   method w(u: int, v: int) returns (weight : int)
@@ -109,7 +109,7 @@ class Dijkstra
 	requires G.isValid() ==> G.d.Length > 0
 	modifies G.d, G.vertices
 	ensures G!= null && G.isValid() && G.hasVertex(s)
-	ensures forall f :: f in G.edges ==> f.weight > 0
+	ensures forall f :: f in G.edges ==> f.weight >= 0
     ensures forall v :: v in G.vertices && v.id != s.id ==> v.visited == false
 	ensures forall e, f  :: e in G.edges && 0 <= f < G.d.Length && f != s.id ==> G.d[f] >= e.weight
 	ensures G.d[s.id] == 0
@@ -122,9 +122,9 @@ class Dijkstra
 
 	 while (loopE != {})
 	 invariant G != null && G.isValid() && |G.edges| > 0
-	 invariant forall j :: j in G.edges ==> j.weight > 0
-	 invariant forall l :: l in loopE ==> l in G.edges ==> l.weight > 0
-	 invariant forall j :: j in loopE ==> j.weight > 0 ==> infinity > 0 
+	 invariant forall j :: j in G.edges ==> j.weight >= 0
+	 invariant forall l :: l in loopE ==> l in G.edges ==> l.weight >= 0
+	 invariant forall j :: j in loopE ==> j.weight >= 0 ==> infinity > 0 
 	 invariant forall e :: e in G.edges && e !in loopE ==> infinity >= e.weight
 	 invariant old(infinity) <= infinity
 	 decreases loopE
@@ -138,7 +138,7 @@ class Dijkstra
 	 invariant G != null && G.isValid() && G.hasVertex(s) 
 	 invariant G.d.Length > 0 ==> G.d != null
 	 invariant 0 <= x <= G.d.Length
-	 invariant infinity > 0
+	 invariant infinity >= 0
 	 invariant forall j :: 0 <= j < x ==> G.d[j] == infinity
 	 invariant forall e :: e in G.edges ==> infinity >= e.weight
 	 modifies G.d, G.vertices
@@ -182,7 +182,7 @@ class Dijkstra
 
 	while (unsettled != {})
 	invariant G!=null && G.isValid() && G.hasVertex(s)
-	invariant forall e | e in G.edges :: e != null && e.weight > 0
+	invariant forall e | e in G.edges :: e != null && e.weight >= 0
 	invariant forall v | v in unsettled :: v in G.vertices
 	invariant forall s | s in settled :: s in G.vertices && s.visited == true
 	invariant G.d != null
@@ -200,8 +200,8 @@ class Dijkstra
 		invariant forall a | a in e :: a in G.edges && a != null
 		invariant forall b | b in e :: 0 <= b.source < G.d.Length
 		invariant forall c | c in e :: 0 <= c.dest < G.d.Length
-		invariant forall l :: l in e ==> l.weight > 0 && l in G.edges
-		modifies  G.dG
+		//invariant forall l :: l in e ==> l.weight >= 0 && l in G.edges && G.hasEdge(l.source, l.dest)
+		modifies  G.d
 		decreases e
 		{
 		  var l : Edge :| l in e;
