@@ -201,7 +201,7 @@ class Dijkstra
 		invariant forall b | b in e :: 0 <= b.source < G.d.Length
 		invariant forall c | c in e :: 0 <= c.dest < G.d.Length
 		invariant forall l :: l in e ==> l.weight > 0 && l in G.edges
-		modifies  G.dG
+		modifies  G.d
 		decreases e
 		{
 		  var l : Edge :| l in e;
