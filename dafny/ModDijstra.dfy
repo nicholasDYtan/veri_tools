@@ -111,6 +111,7 @@ class Dijkstra
 	ensures G!= null && G.isValid() && G.hasVertex(s)
 	ensures forall f :: f in G.edges ==> f.weight > 0
     ensures forall v :: v in G.vertices && v.id != s.id ==> v.visited == false
+	ensures forall e, f  :: e in G.edges && 0 <= f < G.d.Length && f != s.id ==> G.d[f] >= e.weight
 	ensures G.d[s.id] == 0
 	{
 	 var x: int := 0;
@@ -123,6 +124,8 @@ class Dijkstra
 	 invariant G != null && G.isValid() && |G.edges| > 0
 	 invariant forall j :: j in G.edges ==> j.weight > 0
 	 invariant forall l :: l in loopE ==> l in G.edges ==> l.weight > 0
+	 invariant forall j :: j in loopE ==> j.weight > 0 ==> infinity > 0 
+	 invariant forall e :: e in G.edges && e !in loopE ==> infinity >= e.weight
 	 invariant old(infinity) <= infinity
 	 decreases loopE
 	 {
@@ -135,8 +138,9 @@ class Dijkstra
 	 invariant G != null && G.isValid() && G.hasVertex(s) 
 	 invariant G.d.Length > 0 ==> G.d != null
 	 invariant 0 <= x <= G.d.Length
+	 invariant infinity > 0
 	 invariant forall j :: 0 <= j < x ==> G.d[j] == infinity
-	 //invariant forall e :: e in G.edges ==> infinity > e.weight
+	 invariant forall e :: e in G.edges ==> infinity >= e.weight
 	 modifies G.d, G.vertices
 	 {
 	  G.d[x] := infinity;
@@ -170,7 +174,7 @@ class Dijkstra
 	modifies G, G.vertices, G.d
 	ensures G != null && G.isValid() && G.hasVertex(s)
 	ensures G.d.Length != 0 ==> d != null
-	ensures d.Length == G.d.Length
+	ensures old(G.d.Length) == G.d.Length
 	{
 	initialisesp(G, s);
 	var settled : set<Vertex> := {};
@@ -178,31 +182,37 @@ class Dijkstra
 
 	while (unsettled != {})
 	invariant G!=null && G.isValid() && G.hasVertex(s)
-	invariant forall e | e in G.edges :: e != null
+	invariant forall e | e in G.edges :: e != null && e.weight > 0
 	invariant forall v | v in unsettled :: v in G.vertices
+	invariant forall s | s in settled :: s in G.vertices && s.visited == true
 	invariant G.d != null
 	decreases unsettled
 	modifies  G.vertices, G.d
 	{
-	 var u : Vertex := removeMin(G, unsettled);
-     u.visited := true;
+	   var u : Vertex := removeMin(G, unsettled);
 	   unsettled := unsettled - {u};
-	   var e := set v : Edge | v in G.edges && v.source == u.id && v.weight > 0  && 0 <= v.dest < G.d.Length ;
+	   var e := set v : Edge | v in G.edges && v.source == u.id ;
 	   settled := settled + {u};
 
 		while( e != {} )
 		invariant G!=null && G.isValid() && G.hasVertex(s)
 		invariant G.isValid() ==> forall e | e in G.edges :: e != null
 		invariant forall a | a in e :: a in G.edges && a != null
-		invariant G.isValid() ==> forall b | b in e :: 0 <= b.source < G.d.Length
-		invariant G.isValid() ==> forall c | c in e :: 0 <= c.dest < G.d.Length
-		modifies  G.d
+		invariant forall b | b in e :: 0 <= b.source < G.d.Length
+		invariant forall c | c in e :: 0 <= c.dest < G.d.Length
+		invariant forall l :: l in e ==> l.weight > 0 && l in G.edges
+		modifies  G.dG
 		decreases e
 		{
 		  var l : Edge :| l in e;
+		  var u : int := G.d[l.dest];
 		  relax(G, l.source, l.dest);
+		  var v : int := G.d[l.dest];
+		  assert u >= v;
 		  e := e - {l};
 		}
+
+		u.visited := true;
 	}
 	d := G.d;
 	assert G.d != null;
