@@ -1,0 +1,32 @@
+module SelectionSort
+
+ use import int.Int
+  use import ref.Ref
+  use import array.Array
+  use import array.IntArraySorted
+  use import array.ArrayPermut
+  use import array.ArrayEq
+
+  let swap (a: array int) (i: int) (j: int) =
+    requires { 0 <= i < length a /\ 0 <= j < length a }
+    ensures { exchange (old a) a i j }
+   let v = a[i] in
+    a[i] <- a[j];
+    a[j] <- v
+
+  let selection_sort (a: array int) =
+    ensures { sorted a }
+'L:
+    for i = 0 to length a - 1 do
+      invariant { sorted_sub a 0 i }
+      invariant { forall k1 k2: int. 0 <= k1 < i <= k2 < length a -> a[k1] <= a[k2] }
+      let min = ref i in
+      for j = i + 1 to length a - 1 do
+        invariant
+          { i <= !min < j && forall k: int. i <= k < j -> a[!min] <= a[k] }
+        if a[j] < a[!min] then min := j
+      done;
+      if !min <> i then swap a !min i
+    done
+
+end
