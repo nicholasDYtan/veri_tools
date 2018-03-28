@@ -82,46 +82,55 @@ class Graph{
 
 class Path{
 
-var length : int;
-var pv: seq<Vertex>;
+
+	var pv: seq<Vertex>;
 
 
-	predicate isValid(G: Graph)
+	predicate isValid(G: Graph, s: Vertex)
 	reads G, G.vertices, G.d , G.edges 
 	reads this, this.pv
 	requires  G.isValid()
 	{
-		|pv| > 1 &&
+		|pv| > 1 && pv[0] == s &&
 		(forall v :: v in pv ==> G.hasVertex(v))  &&
 		(forall b :: b in pv ==> 0 <= b.id < G.d.Length) &&
 		(forall i, j :: 0 <= i < |pv| -1 && (j == i + 1) ==>
 		 G.hasEdge(pv[i].id, pv[j].id))
 	}
 
-  function Length(G: Graph): int
-  reads G, G.vertices, G.d , G.edges
-  reads this, this.pv
-  requires  G.isValid() && this.isValid(G)
-  {
-    Sum(0, |pv| - 1, i reads this, this.pv, G, G.edges, G.vertices, G.d
-                       requires 0 <= i < |pv| - 1 && G.isValid() && this.isValid(G) =>
-                       G.Weight(pv[i].id, pv[i+1].id) )
-  }
-  
-  function Sum(lo: int, hi: int, f: int  ~> int): int
-  requires forall i | lo <= i < hi :: f.requires(i)
-  decreases hi - lo
-  reads set i, o | lo <= i < hi && o in f.reads(i) :: o
-  {
-  if lo >= hi then 0
-  else f(lo) + Sum(lo + 1, hi, f)
-  }
 
-	predicate isShorter(G:Graph)
-	reads G, G.vertices, G.d , G.edges,  this, this.pv
-	requires G.isValid() && this.isValid(G)
+	function getPos(p : seq<Vertex>, u : Vertex) : int
+	requires u in p
 	{
-		G.d[pv[|pv|-1].id] > Length(G)
+	   var x : int :| 0 <= x < |p| && p[x] == u;
+	   x
+	}
+
+	function Length(G: Graph, s: Vertex): int
+	reads G, G.vertices, G.d , G.edges
+	reads this, this.pv
+	requires  G.isValid() && this.isValid(G,s)
+	{
+		Sum(0, |pv| - 1, i reads this, this.pv, G, G.edges, G.vertices, G.d
+                       requires 0 <= i < |pv| - 1 && G.isValid() && this.isValid(G,s) =>
+                       G.Weight(pv[i].id, pv[i+1].id) )
+	}
+  
+	function Sum(lo: int, hi: int, f: int  ~> int): int
+	requires forall i | lo <= i < hi :: f.requires(i)
+	decreases hi - lo
+	reads set i, o | lo <= i < hi && o in f.reads(i) :: o
+	{
+		if lo >= hi then 0
+		else f(lo) + Sum(lo + 1, hi, f)
+	}
+
+
+	predicate isShorter(G:Graph, s:Vertex)
+	reads G, G.vertices, G.d , G.edges,  this, this.pv
+	requires G.isValid() && this.isValid(G,s)
+	{
+		G.d[pv[|pv|-1].id] > Length(G, s)
 	}
 }
 
@@ -208,7 +217,7 @@ class Dijkstra
 	requires 0 <= u < G.d.Length && 0 <= v < G.d.Length
 	modifies G.d
 	ensures 0 <= u < G.d.Length && 0 <= v < G.d.Length
-  ensures G.isValid() && G.hasEdge(u,v)
+    ensures G.isValid() && G.hasEdge(u,v)
 	ensures old(G.d[v]) >= G.d[v]
 	{
 	  var g : int := G.w(u,v);
@@ -219,36 +228,41 @@ class Dijkstra
 	method sssp(G: Graph, s: Vertex) returns (d : array<int>)
 	requires G.isValid() && G.hasVertex(s)
 	requires G.isValid() ==> G.vertices != {}
-	requires !(exists l : Path :: l.isValid(G) && !l.isShorter(G))
+	requires !(exists l : Path :: l.isValid(G,s) && !l.isShorter(G,s))
 	modifies G, G.vertices, G.d
 	ensures G.isValid() && G.hasVertex(s)
 	ensures G.d.Length != 0 
 	ensures old(G.d.Length) == G.d.Length
-	ensures !(exists l : Path :: l.isValid(G) && l.isShorter(G))
+	ensures !(exists l : Path :: l.isValid(G,s) && l.isShorter(G,s))
 	{
 	initialisesp(G, s);
 	var settled : set<Vertex> := {};
 	var unsettled : set<Vertex> := G.vertices;
 
-	while (unsettled != {})
+    while (unsettled != {})
 	invariant G.isValid() && G.hasVertex(s)
 	invariant forall e | e in G.edges :: e.weight > 0
 	invariant forall v | v in unsettled :: v in G.vertices
 	invariant forall s | s in settled :: s in G.vertices && s.visited == true
+	//for all nodes h that are settled, there doesn't exist a valid path where the last node is h and its Length is shorter than our
+	//computed shortest path, in other words all settled nodes have the shortest path already estimated
+	invariant forall h | h in settled :: !(exists p: Path :: p.isValid(G,s) && p.pv[|p.pv|-1] == h && p.Length(G,s) < G.d[h.id])
 	decreases unsettled
 	modifies  G.vertices, G.d
 	{
 	   var u : Vertex := removeMin(G, unsettled);
 	   unsettled := unsettled - {u};
-	   var e := set v : Edge | v in G.edges && v.source == u.id ;
-	   settled := settled + {u};
+	   var e := set v : Edge | v in G.edges && v.source == u.id;
+	  
 
 		while( e != {} )
 		invariant G.isValid() && G.hasVertex(s)
 		invariant forall a | a in e :: a in G.edges 
 		invariant forall b | b in e :: 0 <= b.source < G.d.Length
 		invariant forall c | c in e :: 0 <= c.dest < G.d.Length
-		//invariant forall d | d !in e && d in G.edges :: G.d[d.dest] <= old(G.d[d.dest])
+		// if an edge that meets the criteria set by e has already been relaxed, then its new shortest path value in 
+		// our G.d store of shortest paths will be shorter than the previous value stored
+		invariant forall d | d !in e && d in G.edges && d.source == u.id :: G.d[d.dest] <= old(G.d[d.dest])
 		modifies  G.d
 		decreases e
 		{
@@ -259,7 +273,7 @@ class Dijkstra
 		  assert u >= v;
 		  e := e - {l};
 		}
-
+		settled := settled + {u};
 		u.visited := true;
 	}
 	d := G.d;
