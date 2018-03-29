@@ -61,16 +61,8 @@ class Graph{
   exists m | m in edges ::  m.source == u && m.dest == v && m.weight > 0
   }
 
-  method w(u: int, v: int) returns (weight : int)
-  requires this.isValid() && this.hasEdge(u,v)
-  requires u < d.Length && v< d.Length
-  ensures weight > 0
-  {
-		var f : Edge :| f in edges  && f.source == u && f.dest == v;
-		weight := f.weight;
-  }
 
-   function Weight(u: int, v: int): int
+   function method w(u: int, v: int): int
   reads this, this.edges, this.vertices
   requires this.isValid() && this.hasEdge(u,v)
   requires u < d.Length && v< d.Length
@@ -113,7 +105,7 @@ class Path{
 	{
 		Sum(0, |pv| - 1, i reads this, this.pv, G, G.edges, G.vertices, G.d
                        requires 0 <= i < |pv| - 1 && G.isValid() && this.isValid(G,s) =>
-                       G.Weight(pv[i].id, pv[i+1].id) )
+                       G.w(pv[i].id, pv[i+1].id) )
 	}
   
 	function Sum(lo: int, hi: int, f: int  ~> int): int
@@ -131,6 +123,13 @@ class Path{
 	requires G.isValid() && this.isValid(G,s)
 	{
 		G.d[pv[|pv|-1].id] > Length(G, s)
+	}
+
+	predicate isEqual(G:Graph, s:Vertex)
+	reads G, G.vertices, G.d , G.edges,  this, this.pv
+	requires G.isValid() && this.isValid(G,s)
+	{
+		G.d[pv[|pv|-1].id] == Length(G, s)
 	}
 }
 
@@ -219,6 +218,7 @@ class Dijkstra
 	ensures 0 <= u < G.d.Length && 0 <= v < G.d.Length
     ensures G.isValid() && G.hasEdge(u,v)
 	ensures old(G.d[v]) >= G.d[v]
+	ensures old(G.d[u]) == G.d[u]
 	{
 	  var g : int := G.w(u,v);
 	  if(G.d[v] > G.d[u] + g ) { G.d[v] := G.d[u] + g;}
@@ -246,13 +246,15 @@ class Dijkstra
 	invariant forall s | s in settled :: s in G.vertices && s.visited == true
 	//for all nodes h that are settled, there doesn't exist a valid path where the last node is h and its Length is shorter than our
 	//computed shortest path, in other words all settled nodes have the shortest path already estimated
-	invariant forall h | h in settled :: !(exists p: Path :: p.isValid(G,s) && p.pv[|p.pv|-1] == h && p.Length(G,s) < G.d[h.id])
+	invariant forall h | h in settled :: !(exists p: Path :: p.isValid(G,s) && p.pv[|p.pv|-1] == h && p.isShorter(G,s))
 	decreases unsettled
 	modifies  G.vertices, G.d
 	{
 	   var u : Vertex := removeMin(G, unsettled);
 	   unsettled := unsettled - {u};
+	   assert forall i | i in unsettled :: G.d[u.id] <= G.d[i.id];
 	   var e := set v : Edge | v in G.edges && v.source == u.id;
+	   var eloop := e;
 	  
 
 		while( e != {} )
@@ -262,7 +264,7 @@ class Dijkstra
 		invariant forall c | c in e :: 0 <= c.dest < G.d.Length
 		// if an edge that meets the criteria set by e has already been relaxed, then its new shortest path value in 
 		// our G.d store of shortest paths will be shorter than the previous value stored
-		invariant forall d | d !in e && d in G.edges && d.source == u.id :: G.d[d.dest] <= old(G.d[d.dest])
+		invariant forall d | d !in e && d in eloop :: G.d[d.dest] <= old(G.d[d.dest])
 		modifies  G.d
 		decreases e
 		{
