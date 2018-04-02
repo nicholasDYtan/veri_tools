@@ -251,6 +251,7 @@ class Dijkstra
 	modifies  G.vertices, G.d
 	{
 	   var u : Vertex := removeMin(G, unsettled);
+	   settled := settled + {u};
 	   unsettled := unsettled - {u};
 	   assert forall i | i in unsettled :: G.d[u.id] <= G.d[i.id];
 	   var e := set v : Edge | v in G.edges && v.source == u.id;
@@ -275,7 +276,7 @@ class Dijkstra
 		  assert u >= v;
 		  e := e - {l};
 		}
-		settled := settled + {u};
+		
 		u.visited := true;
 	}
 	d := G.d;
