@@ -228,12 +228,11 @@ class Dijkstra
 	method sssp(G: Graph, s: Vertex) returns (d : array<int>)
 	requires G.isValid() && G.hasVertex(s)
 	requires G.isValid() ==> G.vertices != {}
-	requires !(exists l : Path :: l.isValid(G,s) && !l.isShorter(G,s))
 	modifies G, G.vertices, G.d
 	ensures G.isValid() && G.hasVertex(s)
 	ensures G.d.Length != 0 
 	ensures old(G.d.Length) == G.d.Length
-	ensures !(exists l : Path :: l.isValid(G,s) && l.isShorter(G,s))
+	//ensures !(exists l : Path :: l.isValid(G,s) && l.isShorter(G,s))
 	{
 	initialisesp(G, s);
 	var settled : set<Vertex> := {};
@@ -246,7 +245,7 @@ class Dijkstra
 	invariant forall s | s in settled :: s in G.vertices && s.visited == true
 	//for all nodes h that are settled, there doesn't exist a valid path where the last node is h and its Length is shorter than our
 	//computed shortest path, in other words all settled nodes have the shortest path already estimated
-	invariant forall h | h in settled :: !(exists p: Path :: p.isValid(G,s) && p.pv[|p.pv|-1] == h && p.isShorter(G,s))
+	//invariant forall h | h in settled :: !(exists p: Path :: p.isValid(G,s) && p.pv[|p.pv|-1] == h && p.isShorter(G,s))
 	decreases unsettled
 	modifies  G.vertices, G.d
 	{
@@ -265,7 +264,7 @@ class Dijkstra
 		invariant forall c | c in e :: 0 <= c.dest < G.d.Length
 		// if an edge that meets the criteria set by e has already been relaxed, then its new shortest path value in 
 		// our G.d store of shortest paths will be shorter than the previous value stored
-		invariant forall d | d !in e && d in eloop :: G.d[d.dest] <= old(G.d[d.dest])
+		//invariant forall d | d !in e && d in eloop :: G.d[d.dest] <= old(G.d[d.dest])
 		modifies  G.d
 		decreases e
 		{
